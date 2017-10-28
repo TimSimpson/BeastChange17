@@ -65,11 +65,17 @@ set_property(TARGET lp3_deps::boost-context PROPERTY
 add_library(lp3_deps::boost-coroutine INTERFACE IMPORTED)
 set_property(TARGET lp3_deps::boost-coroutine PROPERTY
     INTERFACE_INCLUDE_DIRECTORIES "${Boost_INCLUDE_DIRS}")
-message(INFO "MARIO MARIO ${Boost_LIBRARIES} \nPOO: ${Boost_CONTEXT_LIBRARY}\n")
 set_property(TARGET lp3_deps::boost-coroutine PROPERTY
     INTERFACE_LINK_LIBRARIES $<$<CONFIG:Debug>:${Boost_COROUTINE_LIBRARY_DEBUG}> $<$<CONFIG:Release>:${Boost_COROUTINE_LIBRARY_RELEASE}>)
 
+message(INFO "MARIO\n\n***${Boost_INCLUDE_DIRS}\n\n***\n")
+# Boost Beast
+
 set(DEPS_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../build/deps")
+
+add_library(lp3_deps::boost-beast INTERFACE IMPORTED)
+set_property(TARGET lp3_deps::boost-beast PROPERTY
+    INTERFACE_INCLUDE_DIRECTORIES "${DEPS_PATH}/beast/include")
 
 ###############################################################################
 #  Subproject

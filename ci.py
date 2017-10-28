@@ -59,80 +59,42 @@ def deps(args):
     if len(args) > 1:
         platform = args[0]
 
-    print('Checking out GSL...')
-    gsl_dir = os.path.join(DEPS_DIR, 'gsl')
-    mkdir(gsl_dir)
-    github_check_call([
-        'git', 'clone',
-        'https://github.com/Microsoft/GSL.git',
-        gsl_dir
-    ])
-    subprocess.check_call([
-        'git', 'checkout',
-        'c2f953f2eb7ab501325a7ec5656b400d54b8a345'
-    ], cwd=gsl_dir)
-
-
     print('Assuming Boost is already available.')
 
+    print('Downloading Beast...')
+    beast_url = 'https://api.github.com/repos/boostorg/beast/zipball/v124'
 
-    if not platform or platform == 'windows':
-        sdl2_url = 'https://9988350550b21bab76e1-e4f58d473b8b67b7df073d18b2ddc43c.ssl.cf1.rackcdn.com/sdl2-win-cmake.zip'
-        subprocess.check_call(['curl', '-o', 'sdl2.zip', sdl2_url], cwd=BUILD_DIR)
+    zip_name = 'beast.zip'
+    subprocess.check_call(['curl', '-o', zip_name, '-L', beast_url], cwd=BUILD_DIR)
+    try:
+        ZipFile = zipfile.Zipfile  # py2
+    except AttributeError:
+        ZipFile = zipfile.ZipFile  # py3
 
-        name = 'sdl2'
-        url = sdl2_url
-        zip_name = '{}.zip'.format(name)
-        print('Downloading {}...'.format(zip_name))
-        subprocess.check_call(['curl', '-o', zip_name, url], cwd=BUILD_DIR)
+    z = ZipFile(os.path.join(BUILD_DIR, zip_name))
 
+    beast_dir = os.path.join(DEPS_DIR, 'beast')
+    unzip_dir = os.path.join(DEPS_DIR, 'unzip')
+
+    # Delete the unzip directory in case we already tried this once.
+    def maybe_delete(directory):
         try:
-            ZipFile = zipfile.Zipfile  # py2
-        except AttributeError:
-            ZipFile = zipfile.ZipFile  # py3
+            shutil.rmtree(directory)
+        except FileNotFoundError:
+            pass
 
-        z = ZipFile(os.path.join(BUILD_DIR, zip_name))
-        z.extractall(os.path.join(DEPS_DIR, name))
+    maybe_delete(beast_dir)
+    maybe_delete(unzip_dir)
 
-    print('Downloading SDL2 Cmake Script from TwinklebearDev')
-    cmake_scripts = os.path.join(DEPS_DIR, 'cmake')
-    mkdir(cmake_scripts)
-    find_sdl_url = 'https://raw.githubusercontent.com/Twinklebear/TwinklebearDev-Lessons/master/cmake/FindSDL2.cmake'
-    github_check_call(['curl', '-o', 'FindSDL2.cmake', find_sdl_url],
-                      cwd=cmake_scripts)
+    z.extractall(unzip_dir)
 
+    # Move the arbitrary root folder of the unzipped code into a known path.
+    dirs = os.listdir(unzip_dir)
+    if len(dirs) != 1:
+        raise RuntimeError('Expected to see one directory here.')
+    shutil.move(os.path.join(unzip_dir, dirs[0]), beast_dir)
 
-
-
-
-
-
-
-    print('Checking out Catch...')
-    catch_dir = os.path.join(DEPS_DIR, 'Catch')
-    mkdir(catch_dir)
-    github_check_call([
-        'git', 'clone',
-        'https://github.com/philsquared/Catch.git',
-        catch_dir
-    ])
-    subprocess.check_call([
-        'git', 'checkout', 'v1.8.2'
-    ], cwd=catch_dir)
-
-
-    print('Checking out GLM...')
-    glm_dir = os.path.join(DEPS_DIR, 'glm')
-    mkdir(glm_dir)
-    github_check_call([
-        'git', 'clone',
-        'https://github.com/g-truc/glm.git',
-        glm_dir
-    ])
-    subprocess.check_call([
-        'git', 'checkout',
-        '40398d67cd3e4f74b08649eda428dc411d801fd5'
-    ], cwd=glm_dir)
+    shutil.rmtree(unzip_dir)
 
 
 @cmd('ubuntu', 'Build on Ubuntu')
