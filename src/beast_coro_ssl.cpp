@@ -9,7 +9,7 @@
 
 //------------------------------------------------------------------------------
 //
-// Example: HTTP SSL client, synchronous
+// Example: HTTP SSL client, coroutine
 //
 //------------------------------------------------------------------------------
 
@@ -19,9 +19,11 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
 #include <boost/asio/connect.hpp>
+#include <boost/asio/spawn.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl/stream.hpp>
 #include <cstdlib>
+#include <functional>
 #include <iostream>
 #include <string>
 
@@ -29,89 +31,129 @@ using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 namespace ssl = boost::asio::ssl;       // from <boost/asio/ssl.hpp>
 namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
 
+//------------------------------------------------------------------------------
+
+// Report a failure
+void
+fail(boost::system::error_code ec, char const* what)
+{
+    std::cerr << what << ": " << ec.message() << "\n";
+}
+
 // Performs an HTTP GET and prints the response
+void
+do_session(
+    std::string const& host,
+    std::string const& port,
+    std::string const& target,
+    int version,
+    boost::asio::io_service& ios,
+    ssl::context& ctx,
+    boost::asio::yield_context yield)
+{
+    boost::system::error_code ec;
+
+    // These objects perform our I/O
+    tcp::resolver resolver{ios};
+    ssl::stream<tcp::socket> stream{ios, ctx};
+
+    // Look up the domain name
+    auto const results_begin = resolver.async_resolve(
+        tcp::resolver::query{host, port}, yield[ec]);
+    tcp::resolver::iterator results_end;
+    if(ec)
+        return fail(ec, "resolve");
+
+    // Make the connection on the IP address we get from a lookup
+    boost::asio::async_connect(stream.next_layer(), results_begin, results_end, yield[ec]);
+    if(ec)
+        return fail(ec, "connect");
+
+    // Perform the SSL handshake
+    stream.async_handshake(ssl::stream_base::client, yield[ec]);
+    if(ec)
+        return fail(ec, "handshake");
+
+    // Set up an HTTP GET request message
+    http::request<http::string_body> req{http::verb::get, target, version};
+    req.set(http::field::host, host);
+    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+
+    // Send the HTTP request to the remote host
+    http::async_write(stream, req, yield[ec]);
+    if(ec)
+        return fail(ec, "write");
+
+    // This buffer is used for reading and must be persisted
+    boost::beast::flat_buffer b;
+
+    // Declare a container to hold the response
+    http::response<http::dynamic_body> res;
+
+    // Receive the HTTP response
+    http::async_read(stream, b, res, yield[ec]);
+    if(ec)
+        return fail(ec, "read");
+
+    // Write the message to standard out
+    std::cout << res << std::endl;
+
+    // Gracefully close the stream
+    stream.async_shutdown(yield[ec]);
+    if(ec == boost::asio::error::eof)
+    {
+        // Rationale:
+        // http://stackoverflow.com/questions/25587403/boost-asio-ssl-async-shutdown-always-finishes-with-an-error
+        ec.assign(0, ec.category());
+    }
+    if(ec)
+        return fail(ec, "shutdown");
+
+    // If we get here then the connection is closed gracefully
+}
+
+//------------------------------------------------------------------------------
+
 int main(int argc, char** argv)
 {
-    try
+    // Check command line arguments.
+    if(argc != 4 && argc != 5)
     {
-        // Check command line arguments.
-        if(argc != 4 && argc != 5)
-        {
-            std::cerr <<
-                "Usage: http-client-sync-ssl <host> <port> <target> [<HTTP version: 1.0 or 1.1(default)>]\n" <<
-                "Example:\n" <<
-                "    http-client-sync-ssl www.example.com 443 /\n" <<
-                "    http-client-sync-ssl www.example.com 443 / 1.0\n";
-            return EXIT_FAILURE;
-        }
-        auto const host = argv[1];
-        auto const port = argv[2];
-        auto const target = argv[3];
-        int version = argc == 5 && !std::strcmp("1.0", argv[4]) ? 10 : 11;
-
-        // The io_service is required for all I/O
-        boost::asio::io_service ios;
-
-        // The SSL context is required, and holds certificates
-        ssl::context ctx{ssl::context::sslv23_client};
-
-        // This holds the root certificate used for verification
-        load_root_certificates(ctx);
-
-        // These objects perform our I/O
-        tcp::resolver resolver{ios};
-        ssl::stream<tcp::socket> stream{ios, ctx};
-
-        // Look up the domain name
-        {
-            auto const begin = resolver.resolve(tcp::resolver::query{host, port});
-            tcp::resolver::iterator end;
-
-            // Make the connection on the IP address we get from a lookup
-            boost::asio::connect(stream.next_layer(), begin, end);
-        }
-
-        // Perform the SSL handshake
-        stream.handshake(ssl::stream_base::client);
-
-        // Set up an HTTP GET request message
-        http::request<http::string_body> req{http::verb::get, target, version};
-        req.set(http::field::host, host);
-        req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-
-        // Send the HTTP request to the remote host
-        http::write(stream, req);
-
-        // This buffer is used for reading and must be persisted
-        boost::beast::flat_buffer buffer;
-
-        // Declare a container to hold the response
-        http::response<http::dynamic_body> res;
-
-        // Receive the HTTP response
-        http::read(stream, buffer, res);
-
-        // Write the message to standard out
-        std::cout << res << std::endl;
-
-        // Gracefully close the stream
-        boost::system::error_code ec;
-        stream.shutdown(ec);
-        if(ec == boost::asio::error::eof)
-        {
-            // Rationale:
-            // http://stackoverflow.com/questions/25587403/boost-asio-ssl-async-shutdown-always-finishes-with-an-error
-            ec.assign(0, ec.category());
-        }
-        if(ec)
-            throw boost::system::system_error{ec};
-
-        // If we get here then the connection is closed gracefully
-    }
-    catch(std::exception const& e)
-    {
-        std::cerr << "Error: " << e.what() << std::endl;
+        std::cerr <<
+            "Usage: http-client-coro-ssl <host> <port> <target> [<HTTP version: 1.0 or 1.1(default)>]\n" <<
+            "Example:\n" <<
+            "    http-client-coro-ssl www.example.com 443 /\n" <<
+            "    http-client-coro-ssl www.example.com 443 / 1.0\n";
         return EXIT_FAILURE;
     }
+    auto const host = argv[1];
+    auto const port = argv[2];
+    auto const target = argv[3];
+    int version = argc == 5 && !std::strcmp("1.0", argv[4]) ? 10 : 11;
+
+    // The io_service is required for all I/O
+    boost::asio::io_service ios;
+
+    // The SSL context is required, and holds certificates
+    ssl::context ctx{ssl::context::sslv23_client};
+
+    // This holds the root certificate used for verification
+    load_root_certificates(ctx);
+
+    // Launch the asynchronous operation
+    boost::asio::spawn(ios, std::bind(
+        &do_session,
+        std::string(host),
+        std::string(port),
+        std::string(target),
+        version,
+        std::ref(ios),
+        std::ref(ctx),
+        std::placeholders::_1));
+
+    // Run the I/O service. The call will return when
+    // the get operation is complete.
+    ios.run();
+
     return EXIT_SUCCESS;
 }
