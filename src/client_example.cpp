@@ -54,7 +54,7 @@ int main(int argc, char** argv)
     ssl::context ctx{ssl::context::sslv23_client};
 
     load_root_certificates(ctx);
-    
+
     boost::asio::spawn(ios, [&](boost::asio::yield_context yield)
     {
         tcp::resolver resolver{ios};
@@ -83,19 +83,20 @@ int main(int argc, char** argv)
         http::async_read(stream, b, res, yield);
 
         std::cout << res << std::endl;
-		
+
 		boost::system::error_code ec;
-		// This is currently failing every single time due to this bug: 
+		// This is currently failing every single time due to this bug:
 		//	https://svn.boost.org/trac10/ticket/12710
         stream.async_shutdown(yield[ec]);
-        if(ec != boost::asio::error::eof)
-        {            
+        if(ec == boost::asio::error::eof) {
+            ec.assign(0, ec.category());
+        } else {
 			boost::asio::detail::throw_error(ec);
-		}
+        }
     });
 
     ios.run();
-    
+
 
     return EXIT_SUCCESS;
 }

@@ -28,3 +28,9 @@ target_link_libraries(client_example
     lp3_deps::openssl
     lp3_deps::boost-beast
     lp3_deps::boost-coroutine lp3_deps::boost-context lp3_deps::boost-system)
+
+add_executable(server_example "${CMAKE_CURRENT_SOURCE_DIR}/src/server_example.cpp")
+target_link_libraries(server_example
+    lp3_deps::openssl
+    lp3_deps::boost-beast
+    lp3_deps::boost-coroutine lp3_deps::boost-context lp3_deps::boost-system)
