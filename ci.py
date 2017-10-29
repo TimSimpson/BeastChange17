@@ -61,40 +61,45 @@ def deps(args):
 
     print('Assuming Boost is already available.')
 
-    print('Downloading Beast...')
-    beast_url = 'https://api.github.com/repos/boostorg/beast/zipball/v124'
+    print('Assuming OpenSSL is already available.')
 
-    zip_name = 'beast.zip'
-    subprocess.check_call(['curl', '-o', zip_name, '-L', beast_url], cwd=BUILD_DIR)
-    try:
-        ZipFile = zipfile.Zipfile  # py2
-    except AttributeError:
-        ZipFile = zipfile.ZipFile  # py3
 
-    z = ZipFile(os.path.join(BUILD_DIR, zip_name))
+    def unzip_deps(name, url):
+        print('Downloading Beast...')
 
-    beast_dir = os.path.join(DEPS_DIR, 'beast')
-    unzip_dir = os.path.join(DEPS_DIR, 'unzip')
-
-    # Delete the unzip directory in case we already tried this once.
-    def maybe_delete(directory):
+        zip_name = '{}.zip'.format(name)
+        subprocess.check_call(['curl', '-o', zip_name, '-L', url], cwd=BUILD_DIR)
         try:
-            shutil.rmtree(directory)
-        except FileNotFoundError:
-            pass
+            ZipFile = zipfile.Zipfile  # py2
+        except AttributeError:
+            ZipFile = zipfile.ZipFile  # py3
 
-    maybe_delete(beast_dir)
-    maybe_delete(unzip_dir)
+        z = ZipFile(os.path.join(BUILD_DIR, zip_name))
 
-    z.extractall(unzip_dir)
+        final_dir = os.path.join(DEPS_DIR, name)
+        unzip_dir = os.path.join(DEPS_DIR, 'unzip')
 
-    # Move the arbitrary root folder of the unzipped code into a known path.
-    dirs = os.listdir(unzip_dir)
-    if len(dirs) != 1:
-        raise RuntimeError('Expected to see one directory here.')
-    shutil.move(os.path.join(unzip_dir, dirs[0]), beast_dir)
+        # Delete the unzip directory in case we already tried this once.
+        def maybe_delete(directory):
+            try:
+                shutil.rmtree(directory)
+            except FileNotFoundError:
+                pass
 
-    shutil.rmtree(unzip_dir)
+        maybe_delete(final_dir)
+        maybe_delete(unzip_dir)
+
+        z.extractall(unzip_dir)
+
+        # Move the arbitrary root folder of the unzipped code into a known path.
+        dirs = os.listdir(unzip_dir)
+        if len(dirs) != 1:
+            raise RuntimeError('Expected to see one directory here.')
+        shutil.move(os.path.join(unzip_dir, dirs[0]), final_dir)
+
+        shutil.rmtree(unzip_dir)
+
+    unzip_deps('beast', 'https://api.github.com/repos/boostorg/beast/zipball/v124')
 
 
 @cmd('ubuntu', 'Build on Ubuntu')

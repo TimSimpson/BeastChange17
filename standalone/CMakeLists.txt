@@ -31,10 +31,26 @@ include(ExternalProject)
 # If you are using this as a subproject, your super project CMakeLists.txt
 # must define the following interface import libraries as seen here.
 
+### OpenSSL
+
+find_package(OpenSSL )
+
+if ("${OPENSSL_FOUND}")
+    add_library(lp3_deps::openssl INTERFACE IMPORTED)
+    set_property(TARGET lp3_deps::openssl PROPERTY
+        INTERFACE_INCLUDE_DIRECTORIES "${OPENSSL_INCLUDE_DIR}")
+    set_property(TARGET lp3_deps::openssl PROPERTY
+        INTERFACE_LINK_LIBRARIES "${OPENSSL_LIBRARIES}")
+    #message(FATAL_ERROR "${OPENSSL_INCLUDE_DIR}")
+else()
+    message(FATAL_ERROR "OpenSSL not found.")
+endif()
+
+
+
 ### Boost
 
 find_package(Boost 1.65.1 COMPONENTS context coroutine system REQUIRED )
-
 
 # Disable autolinking - comes from this Stack Overflow question:
 # http://stackoverflow.com/questions/6646405/how-do-you-add-boost-libraries-in-cmakelists-txt
@@ -50,14 +66,12 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 add_library(lp3_deps::boost-system INTERFACE IMPORTED)
 set_property(TARGET lp3_deps::boost-system PROPERTY
     INTERFACE_INCLUDE_DIRECTORIES "${Boost_INCLUDE_DIRS}")
-message(INFO "MARIO MARIO ${Boost_LIBRARIES}")
 set_property(TARGET lp3_deps::boost-system PROPERTY
     INTERFACE_LINK_LIBRARIES $<$<CONFIG:Debug>:${Boost_SYSTEM_LIBRARY_DEBUG}> $<$<CONFIG:Release>:${Boost_SYSTEM_LIBRARY_RELEASE}>)
 
 add_library(lp3_deps::boost-context INTERFACE IMPORTED)
 set_property(TARGET lp3_deps::boost-context PROPERTY
     INTERFACE_INCLUDE_DIRECTORIES "${Boost_INCLUDE_DIRS}")
-message(INFO "MARIO MARIO ${Boost_LIBRARIES}")
 set_property(TARGET lp3_deps::boost-context PROPERTY
     INTERFACE_LINK_LIBRARIES $<$<CONFIG:Debug>:${Boost_CONTEXT_LIBRARY_DEBUG}> $<$<CONFIG:Release>:${Boost_CONTEXT_LIBRARY_RELEASE}>)
 

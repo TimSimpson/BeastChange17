@@ -16,5 +16,15 @@ cmake_minimum_required(VERSION 3.2 FATAL_ERROR)
 # add_exe(reverse_fibonacci)
 # add_exe(symmetric_coro)
 
-add_executable(beast_example "${CMAKE_CURRENT_SOURCE_DIR}/src/beast_example.cpp")
-target_link_libraries(beast_example lp3_deps::boost-beast lp3_deps::boost-coroutine lp3_deps::boost-context lp3_deps::boost-system)
+# add_executable(beast_example "${CMAKE_CURRENT_SOURCE_DIR}/src/beast_example.cpp")
+# target_link_libraries(beast_example lp3_deps::boost-beast lp3_deps::boost-coroutine lp3_deps::boost-context lp3_deps::boost-system)
+
+# add_executable(beast_coro "${CMAKE_CURRENT_SOURCE_DIR}/src/beast_coro.cpp")
+# target_link_libraries(beast_coro lp3_deps::boost-beast lp3_deps::boost-coroutine lp3_deps::boost-context lp3_deps::boost-system)
+
+
+add_executable(beast_coro_ssl "${CMAKE_CURRENT_SOURCE_DIR}/src/beast_coro_ssl.cpp")
+target_link_libraries(beast_coro_ssl
+    lp3_deps::openssl
+    lp3_deps::boost-beast
+    lp3_deps::boost-coroutine lp3_deps::boost-context lp3_deps::boost-system)
